@@ -266,22 +266,6 @@ class _Library extends StatelessWidget {
     Widget _childBuilder(final BuildContext context, final int index) {
       const shape = RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Constants.radius));
-
-//      if (cm.length == index)
-//        return Material(
-//          shape: shape,
-//          clipBehavior: Clip.hardEdge,
-//          child: InkWell(
-//            onTap: _addCustomListManager,
-//            child: Transform.scale(
-//              scale: 0.5,
-//              child: const FittedBox(
-//                fit: BoxFit.cover,
-//                child: Icon(Icons.add),
-//              ),
-//            ),
-//          ),
-//        );
       if (cm.length <= index) return null;
       return AnimationConfiguration.staggeredGrid(
         position: index,
@@ -332,6 +316,7 @@ class _Library extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: const <Widget>[
                     Icon(Icons.add),
+                    const VerticalDivider(width: 5),
                     Text('Add Playlist'),
                   ],
                 ),
@@ -471,9 +456,6 @@ class AlbumImageView extends StatelessWidget {
                 onTap: () {
                   return AlbumInfoPage.push(context, albumInfo);
                 },
-//                onLongPress: () {
-//                  return AlbumInfoPagePreview.push(context, albumInfo);
-//                },
               ),
             ),
           ],

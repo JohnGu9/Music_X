@@ -1,6 +1,77 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:music/component.dart';
+import 'package:music/component/CustomList.dart';
+
+const SettingDatabase = 'setting';
+
+class SettingStorage extends BaseList<String> with DataBaseExtendList {
+  static final SettingStorage instance = SettingStorage._internal();
+
+  factory SettingStorage() {
+    return instance;
+  }
+
+  SettingStorage._internal() {
+    initialization = _init();
+  }
+
+  Future initialization;
+
+  _init() async {
+    await bind(database: SettingDatabase, table: 'normal');
+
+    themeInit() async {
+      if (getData(ThemeHeritage.storageKey) == null)
+        await setData('ThemeHeritage.storageKey', themesName[Themes.Blue]);
+    }
+
+    await themeInit();
+  }
+
+  final DatabaseKey primaryKey = DatabaseKey<String>(keyName: 'id');
+  final DatabaseKey dataKey = DatabaseKey<String>(keyName: 'data');
+
+  final Map<String, String> dataMap = Map();
+
+  getData(final String key) {
+    return dataMap[key];
+  }
+
+  setData(final String key, final String data) async {
+    if (!contains(key)) add(key);
+    dataMap[key] = data;
+    await batchDatabaseUpdate({indexOf(key)});
+  }
+
+  @override
+  Map<String, String> elementToMap({int index, String element}) {
+    // TODO: implement elementToMap
+    if (index == null) index = indexOf(element);
+    return {
+      primaryKey.keyName: this[index],
+      dataKey.keyName: dataMap[this[index]]
+    };
+  }
+
+  @override
+  Future<List> recoverToList() async {
+    // TODO: implement recoverToList
+    final Iterable<Map> _maps = await maps;
+    final List<String> list = List();
+    for (final Map e in _maps) {
+      final key = e[primaryKey.keyName];
+      list.add(key);
+      dataMap[key] = e[dataKey.keyName];
+    }
+    return list;
+  }
+
+  @override
+  // TODO: implement structure
+  List<DatabaseKey> get structure => [primaryKey, dataKey];
+}
 
 enum Themes {
   Blue,
@@ -10,7 +81,7 @@ enum Themes {
   White,
 }
 
-final _name = {
+final themesName = {
   Themes.Blue: 'Blue',
   Themes.Purple: 'Purple',
   Themes.Indigo: 'Indigo',
@@ -18,7 +89,7 @@ final _name = {
   Themes.White: 'White',
 };
 
-final themes = {
+final themesData = {
   Themes.Blue: ThemeData(
     primarySwatch: Colors.blue,
   ),
@@ -46,8 +117,18 @@ final themes = {
 };
 
 class ThemeHeritage extends Heritage<ThemeData> {
+  static const String storageKey = 'Theme';
+
   static String toName({Themes theme, ThemeData themeData}) {
-    return _name[theme];
+    return themesName[theme];
+  }
+
+  static Themes getThemes({final String name}) {
+    Themes themes;
+    themesName.forEach((final key, final value) {
+      if (value == name) themes = key;
+    });
+    return themes;
   }
 
   static ThemeHeritage of(BuildContext context) {
@@ -58,13 +139,16 @@ class ThemeHeritage extends Heritage<ThemeData> {
     @required HeritageBuilder<ThemeData> heritageBuilder,
     Themes theme = Themes.Black,
   }) : super(
-            controller: ValueNotifier(themes[theme]),
+            controller: ValueNotifier(themesData[theme]),
             heritageBuilder: heritageBuilder);
 
   void changeTheme({ThemeData themeData, Themes theme}) {
     if (themeData != null)
       super.change(themeData);
-    else if (theme != null) super.change(themes[theme]);
+    else if (theme != null) {
+      super.change(themesData[theme]);
+      SettingStorage.instance.setData(storageKey, themesName[theme]);
+    }
   }
 }
 

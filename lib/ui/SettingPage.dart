@@ -135,7 +135,7 @@ class _Preference extends StatelessWidget {
 
   static Widget _builder(BuildContext context, Themes theme) {
     return Card(
-      color: themes[theme].primaryColor,
+      color: themesData[theme].primaryColor,
       child: ListTile(
         title: Text(ThemeHeritage.toName(theme: theme)),
         onTap: () {

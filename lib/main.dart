@@ -9,9 +9,13 @@ import 'package:music/unit/Streams.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
+  await Future.wait([
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]),
+    SettingStorage.instance.initialization,
   ]);
+
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
   ));
@@ -29,7 +33,7 @@ class FlutterActivity extends StatefulWidget {
 class _FlutterActivityState extends State<FlutterActivity>
     with TickerProviderStateMixin {
   static Widget _heritageBuilder(BuildContext context, ThemeData value) {
-    if (value == themes[Themes.Black] || value == themes[Themes.White])
+    if (value == themesData[Themes.Black] || value == themesData[Themes.White])
       return MaterialApp(
         title: 'Flutter Demo',
         theme: value,
@@ -74,6 +78,8 @@ class _FlutterActivityState extends State<FlutterActivity>
     return NotificationListener(
       onNotification: _onNotification,
       child: ThemeHeritage(
+        theme: ThemeHeritage.getThemes(
+            name: SettingStorage.instance.getData(ThemeHeritage.storageKey)),
         heritageBuilder: _heritageBuilder,
       ),
     );

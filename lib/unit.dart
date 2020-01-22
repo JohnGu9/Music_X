@@ -4,5 +4,5 @@ export 'unit/Constants.dart';
 export 'unit/MediaMetadataRetriever.dart';
 export 'unit/Native.dart';
 export 'unit/Streams.dart';
-export 'unit/ThemeController.dart';
+export 'controller/SettingController.dart';
 export 'unit/MediaPlayer.dart';
