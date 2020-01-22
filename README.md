@@ -1,4 +1,4 @@
-# musicx
+# music
 
 A new Flutter application.
 

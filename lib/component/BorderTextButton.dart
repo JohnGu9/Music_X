@@ -10,6 +10,7 @@ class BorderTextButton extends StatelessWidget {
       this.textColor,
       this.fontSize,
       this.icon,
+      this.customIcon,
       this.elevation = 0.0})
       : super(key: key);
   final String text;
@@ -19,6 +20,7 @@ class BorderTextButton extends StatelessWidget {
   final Color textColor;
   final double elevation;
   final double fontSize;
+  final Widget customIcon;
   final IconData icon;
 
   @override
@@ -36,13 +38,26 @@ class BorderTextButton extends StatelessWidget {
               fontWeight: FontWeight.w500,
               color: textColor ?? _color)),
     ];
-    if (icon != null)
-      content
-        ..add(const VerticalDivider(width: 5))
-        ..add(Icon(
-          icon,
-          color: textColor ?? _color,
-        ));
+    if (text.isNotEmpty) {
+      if (customIcon != null)
+        content..add(const VerticalDivider(width: 5))..add(customIcon);
+      else if (icon != null)
+        content
+          ..add(const VerticalDivider(width: 5))
+          ..add(Icon(
+            icon,
+            color: textColor ?? _color,
+          ));
+    } else {
+      if (customIcon != null)
+        content..add(customIcon);
+      else if (icon != null)
+        content
+          ..add(Icon(
+            icon,
+            color: textColor ?? _color,
+          ));
+    }
     return Material(
       shape: shape,
       animationDuration: Duration.zero,

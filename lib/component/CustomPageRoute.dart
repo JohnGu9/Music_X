@@ -10,8 +10,7 @@ typedef TransitionBuilder = Widget Function(
     BuildContext context,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
-    Widget child,
-    Widget gesture);
+    Widget child);
 
 class CustomPageRoute<T> extends PageRoute<T> {
   CustomPageRoute(
@@ -19,7 +18,7 @@ class CustomPageRoute<T> extends PageRoute<T> {
       RouteSettings settings,
       TransitionBuilder transitionBuilder,
       Duration transitionDuration,
-      this.opaque = false})
+      this.opaque = true})
       : assert(builder != null),
         this.duration = transitionDuration ?? CustomRouteTransitionDuration,
         this.transitionBuilder = transitionBuilder ?? _defaultTransitionBuilder,
@@ -65,8 +64,7 @@ class CustomPageRoute<T> extends PageRoute<T> {
       BuildContext context,
       Animation<double> animation,
       Animation<double> secondaryAnimation,
-      Widget child,
-      Widget gesture) transitionBuilder;
+      Widget child) transitionBuilder;
 
   static final _transitionTween = Tween<double>(begin: 0, end: 1);
 
@@ -74,8 +72,7 @@ class CustomPageRoute<T> extends PageRoute<T> {
           BuildContext context,
           Animation<double> animation,
           Animation<double> secondaryAnimation,
-          Widget child,
-          Widget gesture) =>
+          Widget child) =>
       FadeTransition(
         opacity: _transitionTween.animate(animation),
         child: Semantics(
@@ -134,11 +131,7 @@ class CustomPageRoute<T> extends PageRoute<T> {
           context,
           animation,
           secondaryAnimation,
-          child,
-          CustomPageRouteGestureDetector<T>(
-            enabledCallback: () => isPopGestureEnabled<T>(this),
-            onStartPopGesture: () => startPopGesture<T>(this),
-          ));
+          child);
 
   static clipOvalTransition(Offset start, {bool backdropShadow = true}) {
     double targetWidth;
@@ -227,6 +220,7 @@ class CustomPageController<T> {
   CustomPageController({
     this.navigator,
     this.controller,
+    this.minFlingVelocity = 1.0,
   })  : routeControllerMaxValue = controller.upperBound -
             (controller.upperBound - controller.lowerBound) * 0.05,
         routeControllerMinValue = controller.lowerBound +
@@ -239,7 +233,7 @@ class CustomPageController<T> {
   @protected
   final NavigatorState navigator;
 
-  static const double _kMinFlingVelocity = 1.0; // Screen widths per second.
+  final double minFlingVelocity; // Screen widths per second.
   static const int _kMaxDroppedSwipePageForwardAnimationTime =
       650; // Milliseconds.
   static const int _kMaxPageBackAnimationTime = 300; // Milliseconds.
@@ -269,12 +263,11 @@ class CustomPageController<T> {
   /// The drag gesture has ended with a horizontal motion of
   /// [fractionalVelocity] as a fraction of screen width per second.
   void dragEnd(double velocity) {
-    assert(navigator!=null);
+    assert(navigator != null);
     const Curve animationToCurve = Curves.bounceOut;
-    const Curve animationBackCurve = Curves.decelerate;
-    bool animateForward;
+    const Curve animationBackCurve = Curves.easeInCirc;
 
-    animateForward = velocity < _kMinFlingVelocity;
+    final animateForward = velocity < minFlingVelocity;
     if (animateForward) {
       final int droppedPageForwardAnimationTime = min(
         lerpDouble(
@@ -312,16 +305,18 @@ class CustomPageController<T> {
 }
 
 class CustomPageRouteGestureDetector<T> extends StatefulWidget {
-  const CustomPageRouteGestureDetector({
-    Key key,
-    @required this.enabledCallback,
-    @required this.onStartPopGesture,
-    this.direction = AxisDirection.left,
+  const CustomPageRouteGestureDetector(
+      {Key key,
+      @required this.enabledCallback,
+      @required this.onStartPopGesture,
+      this.hitTestBehavior = HitTestBehavior.translucent,
+      this.direction = AxisDirection.left,
+      this.child})
+      : super(key: key);
 
-    /// The abstract push animation direction
-  }) : super(key: key);
-
+  final HitTestBehavior hitTestBehavior;
   final AxisDirection direction;
+  final Widget child;
 
   final ValueGetter<bool> enabledCallback;
   final ValueGetter<CustomPageController<T>> onStartPopGesture;
@@ -344,14 +339,13 @@ class _CustomPageRouteGestureDetectorState
 
   void _handleDragUpdate(DragUpdateDetails details) {
     assert(mounted);
-    _backGestureController.dragUpdate(
-        _convertToLogical(details.primaryDelta / context.size.height));
+    _backGestureController.dragUpdate(_convertToLogical(details.delta));
   }
 
   void _handleDragEnd(DragEndDetails details) {
     assert(mounted);
-    _backGestureController.dragEnd(_convertToLogical(
-        details.velocity.pixelsPerSecond.dy / context.size.height));
+    _backGestureController
+        .dragEnd(_convertToLogical(details.velocity.pixelsPerSecond));
     _backGestureController = null;
   }
 
@@ -366,15 +360,16 @@ class _CustomPageRouteGestureDetectorState
   }
 
   // ignore: unused_element
-  double _convertToLogical(double value) {
+  double _convertToLogical(Offset value) {
     switch (widget.direction) {
       case AxisDirection.up:
+        return value.dy / MediaQuery.of(context).size.height;
       case AxisDirection.left:
-        return value;
-
-      case AxisDirection.right:
+        return value.dx / MediaQuery.of(context).size.width;
       case AxisDirection.down:
-        return -value;
+        return -value.dy / MediaQuery.of(context).size.height;
+      case AxisDirection.right:
+        return -value.dx / MediaQuery.of(context).size.width;
 
       default:
         assert(false);
@@ -407,9 +402,15 @@ class _CustomPageRouteGestureDetectorState
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
+    if (widget.child == null)
+      return Listener(
+        onPointerDown: _handlePointerDown,
+        behavior: widget.hitTestBehavior,
+      );
     return Listener(
       onPointerDown: _handlePointerDown,
-      behavior: HitTestBehavior.translucent,
+      behavior: widget.hitTestBehavior,
+      child: widget.child,
     );
   }
 }

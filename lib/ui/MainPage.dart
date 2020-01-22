@@ -1,53 +1,55 @@
+import 'dart:math';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:musicx/component.dart';
-import 'package:musicx/ui/ListBuilder.dart';
-import 'package:musicx/unit.dart';
-import 'package:musicx/unit/Streams.dart';
+import 'package:music/component.dart';
+import 'package:music/controller/CustomInfoProvider.dart';
+import 'package:music/controller/CustomListManager.dart';
+import 'package:music/controller/MediaPlayerController.dart';
+import 'package:music/ui.dart';
+import 'package:music/ui/ManagePage.dart';
+import 'package:music/ui/SettingPage.dart';
+import 'package:music/unit.dart';
+import 'package:music/unit/Streams.dart';
+
+const PageSidePadding =
+    const EdgeInsets.symmetric(horizontal: 30, vertical: 20);
 
 class MainPage extends StatelessWidget {
-  const MainPage({Key key, this.animation, this.secondaryAnimation})
-      : super(key: key);
-  final Animation animation;
-  final Animation secondaryAnimation;
+  const MainPage({Key key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
     return _SecondaryTransitionBuilder(
-      animation: secondaryAnimation,
-      child: _PrimaryTransitionBuilder(
-        animation: animation,
-        colors: [
-          Theme.of(context).primaryColor.withOpacity(0.4),
-          Theme.of(context).primaryColor.withOpacity(0.7),
-          Theme.of(context).primaryColor,
-        ],
+      animation: GeneralNavigator.of(context).secondaryAnimation,
+      child: ValueListenableBuilder(
+        valueListenable: ThemeHeritage.of(context).controller,
+        builder: _builder,
       ),
+    );
+  }
+
+  static Widget _builder(BuildContext context, ThemeData value, Widget child) {
+    return _PrimaryTransitionBuilder(
+      animation: GeneralNavigator.of(context).animation,
+      colors: [
+        Theme.of(context).primaryColor.withOpacity(0.4),
+        Theme.of(context).primaryColor.withOpacity(0.7),
+        Theme.of(context).primaryColor,
+      ],
     );
   }
 }
 
-class _SecondaryTransitionBuilder extends AnimatedWidget {
-  const _SecondaryTransitionBuilder({Key key, this.child, this.animation})
-      : super(key: key, listenable: animation);
-  final Widget child;
-  final Animation<double> animation;
-  static final _tween = Tween(begin: 1.0, end: 0.8);
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO: implement build
-    final double scaleValue = _tween.evaluate(animation);
-    final Matrix4 transform = Matrix4.identity()
-      ..scale(scaleValue, scaleValue, 1.0);
-    return Transform(
-      transform: transform,
-      alignment: Alignment.center,
-      child: child,
-    );
-  }
+const titlePadding = const EdgeInsets.symmetric(vertical: 30, horizontal: 30);
+// ignore: non_constant_identifier_names
+Widget _SecondaryTransitionBuilder({Animation animation, Widget child}) {
+  return SecondaryTransition(
+    listenable: animation,
+    child: child,
+  );
 }
 
 class _PrimaryTransitionBuilder extends AnimatedWidget {
@@ -107,65 +109,103 @@ class _PrimaryTransitionBuilder extends AnimatedWidget {
             automaticallyImplyLeading: false,
             expandedHeight: 200,
             backgroundColor: Colors.transparent,
+            actions: <Widget>[
+              IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () {
+                    return SettingPage.push(context);
+                  })
+            ],
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.all(30.0),
+              titlePadding: titlePadding,
               title: FadeTransition(
-                  opacity: delayAnimation, child: Text('Music X')),
+                  opacity: delayAnimation,
+                  child: Text(
+                    'Music X',
+                    style: TextStyle(
+                      color: Colors.white,
+                    ),
+                  )),
             ),
           ),
-          CupertinoSliverRefreshControl(
+          const CupertinoSliverRefreshControl(
             onRefresh: _onRefresh,
           ),
           SliverToBoxAdapter(
             child: FractionalTranslation(
-              translation: Tween(begin: Offset(0, 1), end: Offset.zero)
+              translation: Tween(begin: const Offset(0, 1), end: Offset.zero)
                   .evaluate(delayAnimation),
-              child: MainList(controller: controller),
+              child: RepaintBoundary(
+                child: StandardListView(
+                  scrollController: controller,
+                  listManager: LibraryListManager(),
+                ),
+              ),
             ),
           ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+                height: MediaQuery.of(context).size.height * Panel.startValue +
+                    8.0),
+          )
         ],
       ),
     );
   }
 
-  Future<void> _onRefresh() async {
-    await Future.delayed(const Duration(seconds: 2));
-    return;
+  static Future<void> _onRefresh() async {
+    await GeneralInfoManager().update();
   }
 }
 
-class MainList extends StatefulWidget {
-  MainList({Key key, this.controller})
-      : listenable = LibraryListViewChildrenBuilder(),
-        super(key: key);
-  final ScrollController controller;
-  final ValueListenable listenable;
+class StandardListView extends StatefulWidget {
+  StandardListView(
+      {Key key,
+      this.scrollController,
+      @required this.listManager,
+      this.tips = defaultTips})
+      : super(key: key);
+  final ScrollController scrollController;
+  final ListManager listManager;
+  final String tips;
+
+  static const defaultTips =
+      'Uh, Sorry... \nLooking for audios \nBut found nothing. ';
 
   @override
-  _MainListState createState() => _MainListState();
+  _StandardListViewState createState() => _StandardListViewState();
 }
 
-class _MainListState extends State<MainList>
+class _StandardListViewState extends State<StandardListView>
     with SingleTickerProviderStateMixin {
   AnimationController _controller;
   Animation<Offset> _position;
-  var _value;
+
+  ManagerState _lastState = ManagerState.unknown;
 
   _listener() async {
     await AnimationStream().idle();
-    if (mounted) {
-      setState(() {
-        _value = widget.listenable.value;
-      });
-      if (_value == null || _value.isEmpty) {
+    if (!mounted) return;
+    if (_lastState != widget.listManager.state) {
+      _lastState = widget.listManager.state;
+      await _controller.animateBack(0.0, curve: Curves.fastOutSlowIn);
+    }
+    if (!mounted) return;
+    setState(() {
+      if (_waitingState) {
         _controller.animateBack(0.0, curve: Curves.fastOutSlowIn);
       } else {
         _controller.animateTo(1.0, curve: Curves.fastOutSlowIn);
       }
-    }
+    });
   }
 
-  _controllerListener(AnimationStatus status) {
+  bool get _waitingState {
+    return widget.listManager.state == ManagerState.idle ||
+        widget.listManager.state == ManagerState.updating;
+  }
+
+  _controllerListener(final AnimationStatus status) {
     switch (status) {
       case AnimationStatus.dismissed:
       case AnimationStatus.completed:
@@ -187,63 +227,86 @@ class _MainListState extends State<MainList>
       ..addStatusListener(_controllerListener);
     _position = Tween(begin: Offset(0.0, 1.0), end: Offset(0.0, 0.0))
         .animate(_controller);
-    widget.listenable.addListener(_listener);
+
+    _listener();
+    widget.listManager.addListener(_listener);
   }
 
   @override
   void dispose() {
     // TODO: implement dispose
-    widget.listenable.removeListener(_listener);
+    widget.listManager.removeListener(_listener);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
-    return _builder(context, _value);
+    return _builder(context, StandardItemMapList(parent: LibraryListManager()));
   }
 
   void _onReorder(int oldIndex, int newIndex) {
-    (widget.listenable as LibraryListViewChildrenBuilder)
-        .reorder(oldIndex, newIndex);
+    widget.listManager.reorder(oldIndex, newIndex);
   }
 
   Widget _builder(BuildContext context, List<Widget> children) {
-    if (children == null || children.isEmpty)
+    if (_waitingState)
       return const Center(
           child: Padding(
         padding: const EdgeInsets.all(50.0),
         child: CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation(Colors.white)),
       ));
-
+    else if (children.isEmpty)
+      return FadeTransition(
+        opacity: _controller,
+        child: SlideTransition(
+          position: _position,
+          child: Material(
+            color: Theme.of(context).backgroundColor,
+            borderRadius: const BorderRadius.all(Constants.radius),
+            child: Padding(
+              padding: const EdgeInsets.all(50.0),
+              child: SizedBox(
+                width: 200,
+                height: 200,
+                child: Text(
+                  widget.tips,
+                  style: Theme.of(context).textTheme.title,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
     return FadeTransition(
       opacity: _controller,
       child: SlideTransition(
         position: _position,
         child: Material(
+          color: Theme.of(context).backgroundColor,
           borderRadius: const BorderRadius.all(Constants.radius),
           child: RawReorderableListView(
-              header: const _ListHeader(),
-              end: SizedBox(
-                height: Constants.radius.y,
-              ),
-              onDragStart: _onDragStart,
-              onDragEnd: _onDragEnd,
-              children: children,
-              onReorder: _onReorder,
-              scrollController: widget.controller),
+            header: const _ListHeader(),
+            end: SizedBox(height: Constants.radius.y),
+            onDragStart: _onDragStart,
+            onDragEnd: _onDragEnd,
+            children: children,
+            onReorder: _onReorder,
+            scrollController: widget.scrollController,
+            protectAreaBottomRight: 150,
+          ),
         ),
       ),
     );
   }
 
   _onDragStart() {
-    AnimationStream.instance.addAnimation(hashCode);
+    return AnimationStream.instance.addAnimation(hashCode);
   }
 
   _onDragEnd() {
-    AnimationStream.instance.removeAnimation(hashCode);
+    return AnimationStream.instance.removeAnimation(hashCode);
   }
 }
 
@@ -257,7 +320,7 @@ class _ListHeader extends StatelessWidget {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         children: <Widget>[
-          const VerticalDivider(width: 20),
+          const VerticalDivider(width: 15),
           BorderTextButton(
             color: Theme.of(context).primaryColor,
             paddingColor: Theme.of(context).primaryColor,
@@ -265,6 +328,7 @@ class _ListHeader extends StatelessWidget {
             textColor: Colors.white,
             fontSize: 16,
             icon: Icons.play_arrow,
+            onTap: _playButton,
           ),
           const VerticalDivider(width: 10),
           BorderTextButton(
@@ -274,9 +338,50 @@ class _ListHeader extends StatelessWidget {
             textColor: Colors.white,
             fontSize: 16,
             icon: Icons.shuffle,
+            onTap: _shuffleButton,
+          ),
+          const VerticalDivider(width: 15),
+          BorderTextButton(
+            color: Theme.of(context).primaryColor,
+            paddingColor: Theme.of(context).primaryColor,
+            text: '',
+            textColor: Colors.white,
+            fontSize: 16,
+            icon: Icons.library_music,
+            onTap: () {
+              return ManagePage.push(context);
+            },
           ),
         ],
       ),
     );
+  }
+
+  _playButton() {
+    final mc = MediaPlayerController();
+    if (mc.state.value == MediaPlayerStatus.paused)
+      return MediaPlayerController().start();
+    else if (mc.state.value == MediaPlayerStatus.end) {
+      MediaPlayerController.setTrack(
+          playlist: LibraryListManager().songInfos,
+          songInfo: LibraryListManager().songInfos.first);
+      mc.start();
+    }
+  }
+
+  _shuffleButton() {
+    MediaPlayerController.switchSequenceMode(
+        mode: MediaPlayerSequenceMode.shuffle);
+    final mc = MediaPlayerController();
+    if (mc.currentPlayList.value == null) {
+      _playButton();
+      return;
+    }
+    final playlist = mc.currentPlayList.value;
+    final currentIndex = mc.currentIndex;
+    final index = Random().nextInt(playlist.length - 2);
+    MediaPlayerController.setTrack(
+        songInfo: playlist[index >= currentIndex ? index + 1 : index]);
+    mc.start();
   }
 }

@@ -973,31 +973,31 @@ Future<T> showCupertinoModalPopup<T>({
 // The curve and initial scale values were mostly eyeballed from iOS, however
 // they reuse the same animation curve that was modeled after native page
 // transitions.
-final Animatable<double> _dialogScaleTween = Tween<double>(begin: 1.3, end: 1.0)
-    .chain(CurveTween(curve: Curves.linearToEaseOut));
-
-Widget _buildCupertinoDialogTransitions(BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child) {
-  final CurvedAnimation fadeAnimation = CurvedAnimation(
-    parent: animation,
-    curve: Curves.easeInOut,
-  );
-  if (animation.status == AnimationStatus.reverse) {
-    return FadeTransition(
-      opacity: fadeAnimation,
-      child: child,
-    );
-  }
-  return FadeTransition(
-    opacity: fadeAnimation,
-    child: ScaleTransition(
-      child: child,
-      scale: animation.drive(_dialogScaleTween),
-    ),
-  );
-}
+//final Animatable<double> _dialogScaleTween = Tween<double>(begin: 1.3, end: 1.0)
+//    .chain(CurveTween(curve: Curves.linearToEaseOut));
+//
+//Widget _buildCupertinoDialogTransitions(BuildContext context,
+//    Animation<double> animation,
+//    Animation<double> secondaryAnimation,
+//    Widget child) {
+//  final CurvedAnimation fadeAnimation = CurvedAnimation(
+//    parent: animation,
+//    curve: Curves.easeInOut,
+//  );
+//  if (animation.status == AnimationStatus.reverse) {
+//    return FadeTransition(
+//      opacity: fadeAnimation,
+//      child: child,
+//    );
+//  }
+//  return FadeTransition(
+//    opacity: fadeAnimation,
+//    child: ScaleTransition(
+//      child: child,
+//      scale: animation.drive(_dialogScaleTween),
+//    ),
+//  );
+//}
 
 /// Displays an iOS-style dialog above the current contents of the app, with
 /// iOS-style entrance and exit animations, modal barrier color, and modal
@@ -1029,24 +1029,24 @@ Widget _buildCupertinoDialogTransitions(BuildContext context,
 ///  * [showDialog], which displays a Material-style dialog.
 ///  * [showGeneralDialog], which allows for customization of the dialog popup.
 ///  * <https://developer.apple.com/ios/human-interface-guidelines/views/alerts/>
-Future<T> showCupertinoDialog<T>({
-  @required BuildContext context,
-  @required WidgetBuilder builder,
-}) {
-  assert(builder != null);
-  return showGeneralDialog(
-    context: context,
-    barrierDismissible: false,
-    barrierColor: _kModalBarrierColor,
-    // This transition duration was eyeballed comparing with iOS
-    transitionDuration: const Duration(milliseconds: 250),
-    pageBuilder: (BuildContext context, Animation<double> animation,
-        Animation<double> secondaryAnimation) {
-      return builder(context);
-    },
-    transitionBuilder: _buildCupertinoDialogTransitions,
-  );
-}
+//Future<T> _showCupertinoDialog<T>({
+//  @required BuildContext context,
+//  @required WidgetBuilder builder,
+//}) {
+//  assert(builder != null);
+//  return showGeneralDialog(
+//    context: context,
+//    barrierDismissible: false,
+//    barrierColor: _kModalBarrierColor,
+//    // This transition duration was eyeballed comparing with iOS
+//    transitionDuration: const Duration(milliseconds: 250),
+//    pageBuilder: (BuildContext context, Animation<double> animation,
+//        Animation<double> secondaryAnimation) {
+//      return builder(context);
+//    },
+//    transitionBuilder: _buildCupertinoDialogTransitions,
+//  );
+//}
 
 class CustomCurve extends Curve {
   const CustomCurve();

@@ -1,4 +1,4 @@
-name: musicx
+name: music
 description: A new Flutter application.
 
 # The following defines the version and build number for your application.
@@ -14,22 +14,26 @@ description: A new Flutter application.
 version: 1.0.0+1
 
 environment:
-  sdk: ">=2.1.0 <3.0.0"
+  sdk: ">=2.3.0 <3.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+  sleek_circular_slider :
+  file_picker:
   flutter_audio_query:
   sqflite:
   path:
+  flutter_staggered_animations:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^0.1.2
+  cupertino_icons:
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

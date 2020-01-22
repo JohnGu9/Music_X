@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart';
@@ -7,18 +7,28 @@ import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 
+import 'CustomList.dart';
+
 class DatabaseHelper {
   static Database database;
 
   static Future<Database> easeDatabase(String name) async =>
       openDatabase(path.join(await getDatabasesPath(), '$name.db'));
+
+  static String generateStructure(List<DatabaseKey> structure) {
+    String res = "(";
+    res += structure.first.toPrimaryString();
+    for (final key in structure.sublist(1)) {
+      res += key.toString();
+    }
+    return res + ")";
+  }
 }
 
 class DatabaseKey<T> {
-  const DatabaseKey({@required this.keyName});
+  const DatabaseKey({@required this.keyName, this.unique = false});
 
   final keyName;
-
 
   static final typeMap = {
     const DatabaseKey<String>(keyName: null).runtimeType: 'TEXT',
@@ -44,11 +54,12 @@ class DatabaseKey<T> {
     return ', ' + keyName + ' ' + typeMap[this.runtimeType];
   }
 
+  final bool unique;
+
   String toPrimaryString() {
-    return keyName +
-        ' ' +
-        typeMap[this.runtimeType] +
-        ' PRIMARY KEY NOT NULL UNIQUE';
+    final res =
+        keyName + ' ' + typeMap[this.runtimeType] + ' PRIMARY KEY NOT NULL';
+    return unique ? res + ' UNIQUE ' : res;
   }
 
   String toWhereString() {
@@ -70,7 +81,7 @@ class LinkedList<T> extends ChangeNotifier implements ValueListenable<List<T>> {
   final String table;
   List<T> list;
 
-  final DatabaseKey primaryKey = DatabaseKey<T>(keyName: 'filePath');
+  final DatabaseKey primaryKey = DatabaseKey<T>(keyName: 'id');
   final DatabaseKey previousKey = DatabaseKey<T>(keyName: 'previous');
   final DatabaseKey nextKey = DatabaseKey<T>(keyName: 'next');
 
@@ -98,9 +109,11 @@ class LinkedList<T> extends ChangeNotifier implements ValueListenable<List<T>> {
   static LinkedList<T> easeLinkedListSync<T>({
     @required String database,
     @required String table,
-  }) =>
-      LinkedList<T>(
-          databaseAsync: DatabaseHelper.easeDatabase(database), table: table);
+  }) {
+    /// this function don't bind table, need to call [bindTable] manual
+    return LinkedList<T>(
+        databaseAsync: DatabaseHelper.easeDatabase(database), table: table);
+  }
 
   Future<LinkedList<T>> bindTable(bool drop) async {
     /// [drop] whether drop the existing table
@@ -447,545 +460,467 @@ class LinkedList<T> extends ChangeNotifier implements ValueListenable<List<T>> {
   List<T> get value => list;
 }
 
-class ImageTable {
-  ImageTable(
-      this.database, this.table, this.primaryKey, this.keys, this.imagePath);
+final nullFuture = Future.delayed(Duration.zero);
 
-  final Database database;
-  final String table;
-  final DatabaseKey primaryKey;
-  final List<DatabaseKey> keys;
-  final String imagePath; // The parent path
+mixin DataBaseExtendList<T> on BaseList<T> {
+  Database get database => _database;
+  @protected
+  Database _database;
 
-  static Future<ImageTable> easeTable({
-    @required String database,
-    @required String table,
-    @required DatabaseKey primaryKey,
-    @required List<DatabaseKey<String>> keys,
-    bool drop = false,
-  }) async {
-    final res = ImageTable(await DatabaseHelper.easeDatabase(database), table,
-        primaryKey, keys, path.join(await getDatabasesPath(), 'images'));
-    if (!await Directory(res.imagePath).exists())
-      Directory(res.imagePath).create();
+  String get table => _table;
+  @protected
+  String _table;
 
-    await Future.wait(
-        [Directory(res.imagePath).createTemp(), res.bindTable(drop: drop)]);
-    return res;
+  List<DatabaseKey> get structure;
+
+  DatabaseKey get primaryKey => structure.first;
+
+  /// just database name without .db
+  /// table name
+  /// the database table data structure
+  @protected
+  Future bind(
+      {@required final String database, @required final String table}) async {
+    _database = await DatabaseHelper.easeDatabase(database);
+    _table = table;
+    await this.database.execute("CREATE TABLE IF NOT EXISTS $table" +
+        DatabaseHelper.generateStructure(structure));
+    innerList = await recoverToList();
   }
 
-  String generateStructure() {
-    String res = "(";
-    res += primaryKey.toPrimaryString();
-    for (final key in keys) {
-      res += key.toString();
-    }
-    return res + ")";
-  }
-
-  Future bindTable({bool drop = false}) async {
-    /// [drop] whether drop the table exists
-    if (drop) {
-      await database.execute("drop table if exists $table");
-    }
-    await database
-        .execute("CREATE TABLE IF NOT EXISTS $table" + generateStructure());
-  }
-
-  dropTable() async {
-    Stream list = Directory(imagePath).list();
-    await for (final item in list) {
-      await item.delete();
-    }
-
-    await database.execute("drop table if exists $table");
-    await database
-        .execute("CREATE TABLE IF NOT EXISTS $table" + generateStructure());
-  }
-
-  static const String fileFormat = '.jpg';
-
-  Future<Map> setData(Map data) async {
-    assert(data.containsKey(primaryKey.keyName));
-    Map<String, String> _data = Map();
-    _data[primaryKey.keyName] = data[primaryKey.keyName];
-    for (final key in keys) {
-      /// store image path
-      String subName = _data[primaryKey.keyName].split('/').last;
-      subName = subName.split('.').first + '-';
-      _data[key.keyName] =
-          path.join(imagePath, subName + key.keyName + fileFormat);
-
-      /// store image as file (database can't store large image)
-      await saveFile(
-          filePath: _data[key.keyName], bytes: data[key.keyName]);
-    }
-    await database.insert(table, _data,
-        conflictAlgorithm: ConflictAlgorithm.replace);
-    return _data;
+  Future dropTable() {
+    return database.execute('drop table if exists $table');
   }
 
   @protected
-  saveFile({final String filePath, final Uint8List bytes})async{
-    assert(false);
-  }
-
-  Future<Map> getRawData(primaryKeyValue) async {
-    // get just filePath without image data
-    List<Map> _maps = await database.query(table,
-        where: primaryKey.toWhereString(),
-        whereArgs: [primaryKeyValue],
-        limit: 1);
-    return _maps.isNotEmpty ? _maps[0] : null;
-  }
-
-  Future<Map> convertToData(Map raw) async {
-    Map map = Map();
-    map[primaryKey.keyName] = primaryKey.dataDecode(raw[primaryKey.keyName]);
-    for (final key in keys) {
-      final file = File(raw[key.keyName]);
-      if (!await file.exists()) {
-        await database.delete(
-          table,
-          where: primaryKey.toWhereString(),
-          whereArgs: [map[primaryKey.keyName]],
-        );
-        return null;
-      }
-      map[key.keyName] = await readFile(filePath: file.path);
-    }
-    return map;
-  }
+  Future<List<Map>> get maps async => await database.query('$table');
 
   @protected
-  Future<Uint8List>readFile({final String filePath})async{
-    assert(false);
-    return null;
-  }
+  Future<List> recoverToList();
 
-  Future<Map> getData(primaryKeyValue) async {
-    Map _map = await getRawData(primaryKeyValue);
-    if (_map == null) return null;
-    Map map = await convertToData(_map);
-    return map;
-  }
+  @protected
+  Map<String, T> elementToMap({int index, T element});
 
-  removeData({primaryKeyValue}) async {
-    List<Map> _maps = await database.query(table,
-        where: primaryKey.toWhereString(),
-        whereArgs: [primaryKeyValue],
-        limit: 1);
-    for (final key in keys) {
-      final file = File(_maps[0][key.keyName]);
-      file.delete();
-    }
-    await database.delete(
-      table,
-      where: primaryKey.toWhereString(),
-      whereArgs: [primaryKeyValue],
-    );
-  }
-
-  Future<int> getSize() async {
-    int len = 0;
-    Stream list = Directory(imagePath).list();
-    await for (final FileSystemEntity file in list) {
-      if (await FileSystemEntity.isFile(file.path))
-        len += await File(file.path).length();
-    }
-    return len;
-  }
-}
-
-class Table {
-  Table(this.database, this.table, this.primaryKey, this.keys);
-
-  final Database database;
-  final String table;
-  final DatabaseKey primaryKey;
-  final List<DatabaseKey> keys;
-
-  static Future<Table> easeTable({
-    @required String database,
-    @required String table,
-    @required DatabaseKey primaryKey,
-    @required List<DatabaseKey> keys,
-    bool drop = false,
-  }) async {
-    final res = Table(
-        await DatabaseHelper.easeDatabase(database), table, primaryKey, keys);
-    await res.bindTable(drop: drop);
-    return res;
-  }
-
-  String generateStructure() {
-    String res = "(";
-    res += primaryKey.toPrimaryString();
-    for (final key in keys) {
-      res += key.toString();
-    }
-    return res + ")";
-  }
-
-  bindTable({bool drop = false}) async {
-    /// [drop] whether drop the table exists
-    if (drop) {
-      await database.execute("drop table if exists $table");
-    }
-    await database
-        .execute("CREATE TABLE IF NOT EXISTS $table" + generateStructure());
-  }
-
-  dropTable() async {
-    await database.execute("drop table if exists $table");
-    await database
-        .execute("CREATE TABLE IF NOT EXISTS $table" + generateStructure());
-  }
-
-  setData(Map data) async {
-    assert(data.containsKey(primaryKey.keyName));
-    Map<String, dynamic> _data = Map();
-    _data[primaryKey.keyName] = primaryKey.dataEncode(data[primaryKey.keyName]);
-    for (final key in keys) {
-      _data[key.keyName] = key.dataEncode(data[key.keyName]);
-    }
-    await database.insert(table, _data,
-        conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<Map> getData(primaryKeyValue) async {
-    List<Map> _maps = await database.query(table,
-        where: primaryKey.toWhereString(),
-        whereArgs: [primaryKey.dataEncode(primaryKeyValue)],
-        limit: 1);
-    if (_maps.isEmpty) {
-      return null;
-    }
-    Map map = Map();
-    map[primaryKey.keyName] =
-        primaryKey.dataDecode(_maps[0][primaryKey.keyName]);
-    for (final key in keys) {
-      map[key.keyName] = key.dataDecode(_maps[0][key.keyName]);
-    }
-    return map;
-  }
-
-  removeData({Map data, primaryKeyValue}) async {
-    if (data != null) {
-      await database.delete(
-        table,
-        where: primaryKey.toWhereString(),
-        whereArgs: [primaryKey.dataEncode(data[primaryKey.keyName])],
-      );
-    } else if (primaryKeyValue != null) {
-      await database.delete(
-        table,
-        where: primaryKey.toWhereString(),
-        whereArgs: [primaryKey.dataEncode(primaryKeyValue)],
-      );
-    }
-  }
-
-  Future<int> getSize() async {
-    return File(database.path).length();
-  }
-}
-
-class SQLiteLinkedList<T> {
-  SQLiteLinkedList(this.database);
-
-  final Database database;
-  String tableName;
-  Map<T, List<T>> primaryKeyMap;
-  List<T> list;
-  T first;
-  T last;
-
-  final DatabaseKey primaryKey = DatabaseKey<T>(keyName: 'filePath');
-  final DatabaseKey previousKey = DatabaseKey<T>(keyName: 'previous');
-  final DatabaseKey nextKey = DatabaseKey<T>(keyName: 'next');
-
-  static String generateStructure(List<DatabaseKey> keys) {
-    String res = "(";
-    res += keys[0].toPrimaryString();
-    res += keys[1].toString();
-    res += keys[2].toString();
-    return res + ")";
-  }
-
-  static const previousIndex = 0;
-  static const nextIndex = 1;
-
-  static Future<SQLiteLinkedList<T>> easeLinkedList<T>({
-    @required String database,
-    @required String table,
-    bool drop = false,
-  }) async {
-    final res =
-        SQLiteLinkedList<T>(await DatabaseHelper.easeDatabase(database));
-    await res.bindTable(table, drop: drop);
-    return res;
-  }
-
-  Map<String, T> itemToMap(T key, List<T> value) {
-    final map = Map<String, T>();
-    map[primaryKey.keyName] = key;
-    map[previousKey.keyName] = value[previousIndex];
-    map[nextKey.keyName] = value[nextIndex];
-    return map;
-  }
-
-  bindTable(String tableName, {bool drop = false}) async {
-    this.tableName = tableName;
-
-    /// [drop] whether drop the table exists
-    if (drop) {
-      await database.execute("drop table if exists $tableName");
-    }
-    await database.execute("CREATE TABLE IF NOT EXISTS $tableName" +
-        generateStructure([primaryKey, previousKey, nextKey]));
-    _initializeMap(await database.query('$tableName'));
-    _initializeList();
-  }
-
-  /// initialize [primaryKeyMap] from [maps]
-  /// call after query [maps] from database
-  void _initializeMap(List<Map<String, dynamic>> maps) {
-    primaryKeyMap = Map<T, List<T>>();
-    if (maps == null || maps.length == 0) {
-      return;
-    }
-    for (final map in maps) {
-      primaryKeyMap[map[primaryKey.keyName]] = [
-        map[previousKey.keyName],
-        map[nextKey.keyName]
-      ];
-      if (map[previousKey.keyName] == null) {
-        first = map[primaryKey.keyName];
-      }
-      if (map[nextKey.keyName] == null) {
-        last = map[primaryKey.keyName];
-      }
-    }
-    assert(first != null && last != null);
-    return;
-  }
-
-  /// initialize [list] from [primaryKeyMap]
-  /// call after [_initializeMap] return
-  void _initializeList() {
-    assert(primaryKeyMap != null);
-    list = List();
-    T index = first;
-    while (index != null) {
-      list.add(index);
-      index = primaryKeyMap[index][nextIndex];
-    }
-  }
-
-  add(T value) async {
-    if (primaryKeyMap.containsKey(value)) {
-      /// linked list don't contains two same values
-      /// any value must be unique
-      return;
-    } else if (list.length == 0) {
-      list.add(value);
-      primaryKeyMap[value] = <T>[null, null];
-      last = first = value;
-      await database.insert(
-        tableName,
-        itemToMap(last, primaryKeyMap[last]),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      return;
-    }
-    list.add(value);
-    primaryKeyMap[last][nextIndex] = value;
-    primaryKeyMap[value] = [last, null];
-    final secondLast = last;
-    last = value;
-    await Future.wait([
-      database.insert(
-        tableName,
-        itemToMap(secondLast, primaryKeyMap[secondLast]),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      ),
-      database.insert(
-        tableName,
-        itemToMap(last, primaryKeyMap[last]),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      ),
+  @protected
+  Future batchDatabaseUpdate(Set<int> indexes) {
+    return Future.wait([
+      for (final int index in indexes)
+        if (index >= 0 && index < length)
+          database.insert(
+            table,
+            elementToMap(index: index),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          )
+        else
+          nullFuture,
     ]);
   }
 
-  addAll(Iterable iterable) async {
-    for (final item in iterable) {
-      await add(item);
-    }
+  @protected
+  Future batchDatabaseDelete(Set<int> indexes) {
+    return Future.wait([
+      for (final int index in indexes)
+        if (index >= 0 && index < length)
+          database.delete(
+            table,
+            where: primaryKey.toWhereString(),
+            whereArgs: [this[index]],
+          )
+        else
+          nullFuture,
+    ]);
   }
 
-  sync(Iterable iterable) async {
-    List copy = List.from(iterable);
-    for (int i = 0; i < list.length;) {
-      copy.contains(list[i]) ? copy.removeAt(i++) : await removeAt(i);
-    }
-    await addAll(copy);
-  }
-
-  insert(int index, T value) async {
-    if (primaryKeyMap.containsKey(value)) {
-      /// linked list don't contains two same values
-      /// any value must be unique
-      return;
-    }
-
-    Future future;
-
-    if (index == 0) {
-      primaryKeyMap[first][previousIndex] = value;
-      primaryKeyMap[value] = [null, first];
-      final secondFirst = first;
-      first = value;
-      future = Future.wait([
-        database.insert(
-          tableName,
-          itemToMap(secondFirst, primaryKeyMap[secondFirst]),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        ),
-        database.insert(
-          tableName,
-          itemToMap(first, primaryKeyMap[first]),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        ),
-      ]);
-    } else if (index == list.length) {
-      primaryKeyMap[last][nextIndex] = value;
-      primaryKeyMap[value] = [last, null];
-      final secondLast = last;
-      last = value;
-      future = Future.wait([
-        database.insert(
-          tableName,
-          itemToMap(secondLast, primaryKeyMap[secondLast]),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        ),
-        database.insert(
-          tableName,
-          itemToMap(last, primaryKeyMap[last]),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        ),
-      ]);
-    } else {
-      primaryKeyMap[list[index - 1]][nextIndex] = value;
-      primaryKeyMap[list[index]][previousIndex] = value;
-      primaryKeyMap[value] = [list[index - 1], list[index]];
-      future = Future.wait([
-        database.insert(
-          tableName,
-          itemToMap(value, primaryKeyMap[value]),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        ),
-        database.update(
-          tableName,
-          itemToMap(list[index - 1], primaryKeyMap[list[index - 1]]),
-          where: primaryKey.toWhereString(),
-          whereArgs: [list[index - 1]],
-        ),
-        database.update(
-          tableName,
-          itemToMap(list[index], primaryKeyMap[list[index]]),
-          where: primaryKey.toWhereString(),
-          whereArgs: [list[index]],
-        ),
-      ]);
-    }
-    list.insert(index, value);
-    await future;
-  }
-
-  dynamic removeAt(int index) async {
-    Future future;
-    T res;
-    if (list.length == 1) {
-      primaryKeyMap.remove(first);
-      res = list.removeAt(index);
-      future = database.delete(tableName,
-          where: primaryKey.toWhereString(), whereArgs: [first]);
-      first = last = null;
-    } else if (index == 0) {
-      primaryKeyMap[list[index + 1]][previousIndex] = null;
-      future = Future.wait([
+  @protected
+  Future refreshAll() async {
+    await database.delete(table);
+    await Future.wait([
+      for (int i = 0; i < length; i++)
         database.delete(
-          tableName,
+          table,
           where: primaryKey.toWhereString(),
-          whereArgs: [first],
-        ),
-        database.update(
-          tableName,
-          itemToMap(list[index + 1], primaryKeyMap[list[index + 1]]),
-          where: primaryKey.toWhereString(),
-          whereArgs: [list[index + 1]],
+          whereArgs: [this[i]],
         )
-      ]);
-      primaryKeyMap.remove(first);
-      res = list.removeAt(index);
-      first = list[index + 1];
-    } else if (index == list.length - 1) {
-      primaryKeyMap[list[index - 1]][nextIndex] = null;
-      future = Future.wait([
-        database.delete(
-          tableName,
-          where: primaryKey.toWhereString(),
-          whereArgs: [last],
-        ),
-        database.update(
-          tableName,
-          itemToMap(list[index - 1], primaryKeyMap[list[index - 1]]),
-          where: primaryKey.toWhereString(),
-          whereArgs: [list[index - 1]],
-        )
-      ]);
-      primaryKeyMap.remove(last);
-      res = list.removeAt(index);
-      last = list[index - 1];
-    } else {
-      primaryKeyMap[list[index - 1]][nextIndex] = list[index + 1];
-      primaryKeyMap[list[index + 1]][previousIndex] = list[index - 1];
-      future = Future.wait([
-        database.delete(
-          tableName,
-          where: primaryKey.toWhereString(),
-          whereArgs: [list[index]],
-        ),
-        database.update(
-          tableName,
-          itemToMap(list[index - 1], primaryKeyMap[list[index - 1]]),
-          where: primaryKey.toWhereString(),
-          whereArgs: [list[index - 1]],
-        ),
-        database.update(
-          tableName,
-          itemToMap(list[index + 1], primaryKeyMap[list[index + 1]]),
-          where: primaryKey.toWhereString(),
-          whereArgs: [list[index + 1]],
-        ),
-      ]);
-      primaryKeyMap.remove(list[index]);
-      res = list.removeAt(index);
+    ]);
+  }
+
+  @override
+  bool remove(Object element) {
+    // TODO: implement remove
+    database.delete(
+      table,
+      where: primaryKey.toWhereString(),
+      whereArgs: [element],
+    );
+    return super.remove(element);
+  }
+
+  @override
+  T removeAt(int index) {
+    // TODO: implement removeAt
+    database.delete(
+      table,
+      where: primaryKey.toWhereString(),
+      whereArgs: [this[index]],
+    );
+    return super.removeAt(index);
+  }
+
+  @override
+  T removeLast() {
+    // TODO: implement removeLast
+    database.delete(
+      table,
+      where: primaryKey.toWhereString(),
+      whereArgs: [this.last],
+    );
+    return super.removeLast();
+  }
+
+  @override
+  void removeRange(int start, int end) {
+    // TODO: implement removeRange
+    final Set<int> _set = List.generate(end - start, (int value) {
+      return value + start;
+    }).toSet();
+    batchDatabaseDelete(_set);
+    super.removeRange(start, end);
+  }
+
+  @override
+  void removeWhere(bool Function(T element) test) {
+    // TODO: implement removeWhere
+    Set<int> _set = Set();
+    for (int i = 0; i < length; i++) if (test(this[i])) _set.add(i);
+    batchDatabaseDelete(_set);
+    super.removeWhere(test);
+  }
+
+  @override
+  void add(element) {
+    // TODO: implement add
+    super.add(element);
+    database.insert(table, elementToMap(element: element),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  @override
+  void addAll(Iterable<T> iterable) {
+    // TODO: implement addAll
+    final int start = length;
+    super.addAll(iterable);
+    final int end = length;
+    final Set<int> _set = List.generate(end - start, (int value) {
+      return value + start;
+    }).toSet();
+    batchDatabaseUpdate(_set);
+  }
+
+  @override
+  void insert(int index, T element) {
+    // TODO: implement insert
+    super.insert(index, element);
+    database.insert(table, elementToMap(element: element),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  @override
+  void insertAll(int index, Iterable<T> iterable) {
+    // TODO: implement insertAll
+    super.insertAll(index, iterable);
+    for (final element in iterable)
+      database.insert(table, elementToMap(element: element),
+          conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  @override
+  void retainWhere(bool Function(T element) test) {
+    // TODO: implement retainWhere
+    super.retainWhere(test);
+    refreshAll();
+  }
+
+  @override
+  void replaceRange(int start, int end, Iterable<T> newContents) {
+    // TODO: implement replaceRange
+    super.replaceRange(start, end, newContents);
+    final Set<int> _set = List.generate(end - start, (int value) {
+      return value + start;
+    }).toSet();
+    batchDatabaseUpdate(_set);
+  }
+
+  @override
+  void sort([int Function(T a, T b) compare]) {
+    // TODO: implement sort
+    super.sort(compare);
+    refreshAll();
+  }
+
+  @override
+  void setAll(int index, Iterable<T> iterable) {
+    // TODO: implement setAll
+    super.setAll(index, iterable);
+    final Set<int> _set = List.generate(iterable.length, (int value) {
+      return value + index;
+    }).toSet();
+    batchDatabaseUpdate(_set);
+  }
+
+  @override
+  void setRange(int start, int end, Iterable<T> iterable, [int skipCount = 0]) {
+    // TODO: implement setRange
+    super.setRange(start, end, iterable, skipCount);
+    final Set<int> _set =
+        List.generate(min(iterable.length, end - start), (int value) {
+      return value + start;
+    }).toSet();
+    batchDatabaseUpdate(_set);
+  }
+
+  @override
+  void fillRange(int start, int end, [fill]) {
+    // TODO: implement fillRange
+    super.fillRange(start, end, fill);
+    final Set<int> _set = List.generate(end - start, (int value) {
+      return value + start;
+    }).toSet();
+    batchDatabaseUpdate(_set);
+  }
+
+  @override
+  void shuffle([Random random]) {
+    super.shuffle(random);
+    refreshAll();
+  }
+
+  @override
+  void clear() {
+    // TODO: implement clear
+    super.clear();
+    refreshAll();
+  }
+}
+
+mixin DataBaseExtendLinkedList<T> on DataBaseExtendList<T> {
+  final DatabaseKey primaryKey = DatabaseKey<T>(keyName: 'id');
+  final DatabaseKey previousKey = DatabaseKey<T>(keyName: 'previous');
+  final DatabaseKey nextKey = DatabaseKey<T>(keyName: 'next');
+
+  @override
+  // TODO: implement structure
+  List<DatabaseKey> structure;
+
+  @override
+  Future bind({@required final String database, @required final String table}) {
+    // TODO: implement bind
+    this.structure = [primaryKey, previousKey, nextKey];
+    return super.bind(database: database, table: table);
+  }
+
+  @override
+  Future<List> recoverToList() async {
+    Iterable<Map> _maps = await maps;
+    final Map<T, Map> _map = Map();
+    T _first;
+    T _last;
+    for (final subMap in _maps) {
+      if (subMap[previousKey.keyName] == null) {
+        _first = subMap[primaryKey.keyName];
+      } else if (subMap[nextKey.keyName] == null) {
+        _last = subMap[primaryKey.keyName];
+      }
+      _map[subMap[primaryKey.keyName]] = {
+        previousKey.keyName: subMap[previousKey.keyName],
+        nextKey.keyName: subMap[nextKey.keyName]
+      };
     }
-    await future;
+
+    final List<T> _list = List();
+    if (_map.isEmpty)
+      return _list;
+    else if (_first != null) {
+      T _current = _first;
+      for (int i = 0; i < _map.length && _current != null; i++) {
+        _list.add(_current);
+        _current = _map[_current][nextKey.keyName];
+      }
+    } else if (_last != null) {
+      T _current = _last;
+      for (int i = 0; i < _map.length && _current != null; i++) {
+        _list.insert(0, _current);
+        _current = _map[_current][previousKey.keyName];
+      }
+    } else {
+      debugPrint('Database table data has broken. \nClear the data...\n');
+      await database.execute("drop table if exists $table");
+      await this.database.execute("CREATE TABLE IF NOT EXISTS $table " +
+          DatabaseHelper.generateStructure(structure));
+      debugPrint('Reconstructed the database table: $table');
+    }
+
+    return _list;
+  }
+
+  @override
+  Map<String, T> elementToMap({int index, final T element}) {
+    if (index == null) index = indexOf(element);
+    return {
+      primaryKey.keyName: this[index],
+      previousKey.keyName: index > 0 ? this[index - 1] : null,
+      nextKey.keyName: index < length - 1 ? this[index + 1] : null,
+    };
+  }
+
+  @override
+  bool remove(Object element) {
+    // TODO: implement remove
+    final index = indexOf(element);
+    final res = super.remove(element);
+    batchDatabaseUpdate({index - 1, index}); // linked the break point
     return res;
   }
 
-  reorder(int oldIndex, int newIndex) async {
-    assert(oldIndex < list.length && newIndex < list.length);
-    if (oldIndex == newIndex) {
+  @override
+  T removeAt(int index) {
+    // TODO: implement removeAt
+    final res = super.removeAt(index);
+    batchDatabaseUpdate({index - 1, index}); // linked the break point
+    return res;
+  }
+
+  @override
+  T removeLast() {
+    // TODO: implement removeLast
+    final res = super.removeLast();
+    if (isNotEmpty)
+      database.insert(table, elementToMap(element: last),
+          conflictAlgorithm: ConflictAlgorithm.replace); // clear the end
+    return res;
+  }
+
+  @override
+  void removeRange(int start, int end) {
+    // TODO: implement removeRange
+    super.removeRange(start, end);
+    batchDatabaseUpdate({start - 1, start}); // linked the break point
+  }
+
+  @override
+  void removeWhere(bool Function(T element) test) {
+    // TODO: implement removeWhere
+    final Iterable<T> removed = takeWhile(test);
+    if (removed.length == 0) {
+      super.removeWhere(test);
+      return;
+    } else if (removed.length == 1) {
+      final index = indexOf(removed.first);
+      super.removeWhere(test);
+      batchDatabaseUpdate({index - 1, index});
       return;
     }
-    if (oldIndex < newIndex) {
-      await insert(newIndex - 1, await removeAt(oldIndex));
-    } else {
-      await insert(newIndex, await removeAt(oldIndex));
+    debugPrint(
+        'Warning: [removeWhere] is not a effective function. It will refresh the entire database');
+    super.removeWhere(test);
+    refreshAll();
+  }
+
+  @override
+  void add(element) {
+    // TODO: implement add
+    super.add(element);
+    final index = indexOf(element) - 1;
+    batchDatabaseUpdate({index});
+  }
+
+  @override
+  void addAll(Iterable<T> iterable) {
+    // TODO: implement addAll
+    super.addAll(iterable);
+    if(iterable.isNotEmpty) {
+      final index = indexOf(iterable.first) - 1;
+      batchDatabaseUpdate({index});
     }
+
+  }
+
+  @override
+  void insert(int index, T element) {
+    // TODO: implement insert
+    super.insert(index, element);
+    batchDatabaseUpdate({index - 1, index + 1});
+  }
+
+  @override
+  void insertAll(int index, Iterable<T> iterable) {
+    // TODO: implement insertAll
+    super.insertAll(index, iterable);
+    batchDatabaseUpdate({index - 1, index + iterable.length});
+  }
+
+  @override
+  void replaceRange(int start, int end, Iterable<T> newContents) {
+    // TODO: implement replaceRange
+    super.replaceRange(start, end, newContents);
+    batchDatabaseUpdate({start - 1, end});
+  }
+
+  @override
+  void setRange(int start, int end, Iterable<T> iterable, [int skipCount = 0]) {
+    // TODO: implement setRange
+    super.setRange(start, end, iterable, skipCount);
+    batchDatabaseUpdate({start - 1, end});
+  }
+
+  @override
+  void setAll(int index, Iterable<T> iterable) {
+    // TODO: implement setAll
+    super.setAll(index, iterable);
+
+    batchDatabaseUpdate(
+        {index - 1, index + iterable.length, index + iterable.length + 1});
+  }
+
+  @override
+  void fillRange(int start, int end, [fill]) {
+    // TODO: implement fillRange
+    super.fillRange(start, end, fill);
+    batchDatabaseUpdate({start - 1, end});
+  }
+}
+
+mixin DatabaseListDebug<T> on DataBaseExtendList<T> {
+  @override
+  Future bind(
+      {@required final String database,
+      @required final String table,
+      final List<DatabaseKey> structure}) async {
+    // TODO: implement bind
+    await (await DatabaseHelper.easeDatabase(database))
+        .execute('drop table if exists $table');
+    return super.bind(database: database, table: table);
+  }
+
+  @override
+  Future batchDatabaseUpdate(Set<int> indexes) async {
+    // TODO: implement batchDatabaseUpdate
+    await super.batchDatabaseUpdate(indexes);
+    debugPrint();
+  }
+
+  @override
+  Future batchDatabaseDelete(Set<int> indexes) async {
+    // TODO: implement batchDatabaseDelete
+    await super.batchDatabaseDelete(indexes);
+    debugPrint();
+  }
+
+  void debugPrint() async {
+    final list = await maps;
+    print('${runtimeType.toString()}');
+    print('->Database side');
+    print(list);
+    print('->own side');
+    print(innerList);
   }
 }

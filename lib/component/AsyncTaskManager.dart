@@ -7,7 +7,6 @@ enum AsyncTaskPriority { MIN, NORMAL, MAX }
 typedef NullCallback = Function();
 
 abstract class AsyncTaskManager<T extends NullCallback> {
-
   AsyncTaskManager() : controller = StreamController() {
     _stream = run().asBroadcastStream();
   }
@@ -22,14 +21,16 @@ abstract class AsyncTaskManager<T extends NullCallback> {
 
   @protected
   Stream<T> run() async* {
-    await for (final T fn in controller.stream) {
-      await Future(fn);
-      yield fn;
-    }
+    await for (final T fn in controller.stream) yield await runSingleTask(fn);
   }
 
+  @protected
+  Future<T> runSingleTask(T fn) async {
+    await Future(fn);
+    return fn;
+  }
 
-  Future runTask(T function, AsyncTaskPriority priority) async {
+  Future<void> runTask(T function, AsyncTaskPriority priority) async {
     if (priority == AsyncTaskPriority.MAX) {
       await Future.microtask(function);
       return;

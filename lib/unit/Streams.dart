@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/scheduler.dart';
 
 class AnimationStream {
@@ -20,19 +19,24 @@ class AnimationStream {
     return _counter != 0;
   }
 
-  Map<int, bool> _hashCodeMap = Map();
+  Map<Object, bool> _objMap = Map();
 
-  addAnimation(int hashCode) {
-    if (_hashCodeMap.containsKey(hashCode)) return;
-    debugPrint("addAnimation");
-    _hashCodeMap[hashCode] = true;
+  addAnimation(Object obj /*the object attach(logical) to animation*/,
+      {Duration timeout = const Duration(seconds: 5)}) {
+    if (_objMap.containsKey(obj)) return;
+    _objMap[obj] = true;
     controller.sink.add(++_counter);
+
+    // protect the resource actually release
+    if (timeout == null) return;
+    Future.delayed(timeout, () => removeAnimation(obj));
   }
 
   removeAnimation(int hashCode) {
-    debugPrint("removeAnimation");
-    if (_hashCodeMap.remove(hashCode)) --_counter;
-    controller.sink.add(_counter);
+    if (_objMap.containsKey(hashCode)) {
+      _objMap.remove(hashCode);
+      controller.sink.add(--_counter);
+    }
   }
 
   Future _idle;

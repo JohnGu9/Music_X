@@ -31,3 +31,20 @@ class CustomValueNotifier<T> extends ChangeNotifier
     _stateCounter += 1;
   }
 }
+
+class LazyValueNotifier<T> extends ChangeNotifier
+    implements ValueListenable<T> {
+  LazyValueNotifier(this.value);
+
+  @override
+  T value;
+
+  @override
+  String toString() => '${describeIdentity(this)}($value)';
+
+  @override
+  void notifyListeners() {
+    // TODO: implement notifyListeners
+    super.notifyListeners();
+  }
+}

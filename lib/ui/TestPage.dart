@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:musicx/component.dart';
-import 'package:musicx/unit.dart';
+import 'package:music/component.dart';
+import 'package:music/unit.dart';
 
 class TestPage extends StatelessWidget {
   const TestPage({Key key, this.animation, this.secondaryAnimation}) : super(key: key);
