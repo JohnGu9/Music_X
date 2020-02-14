@@ -737,18 +737,21 @@ mixin DataBaseExtendLinkedList<T> on DataBaseExtendList<T> {
     }
 
     final List<T> _list = List();
+
     if (_map.isEmpty)
       return _list;
     else if (_first != null) {
       T _current = _first;
       for (int i = 0; i < _map.length && _current != null; i++) {
         _list.add(_current);
+        if(!_map.containsKey(_current)) return _list;
         _current = _map[_current][nextKey.keyName];
       }
     } else if (_last != null) {
       T _current = _last;
       for (int i = 0; i < _map.length && _current != null; i++) {
         _list.insert(0, _current);
+        if(!_map.containsKey(_current)) return _list;
         _current = _map[_current][previousKey.keyName];
       }
     } else {

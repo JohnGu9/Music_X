@@ -154,7 +154,7 @@ class _PrimaryTransitionBuilder extends AnimatedWidget {
   }
 
   static Future<void> _onRefresh() async {
-    await GeneralInfoManager().update();
+    await SongInfoManager().update();
   }
 }
 
@@ -272,7 +272,7 @@ class _StandardListViewState extends State<StandardListView>
                 height: 200,
                 child: Text(
                   widget.tips,
-                  style: Theme.of(context).textTheme.title,
+                  style: Theme.of(context).textTheme.headline6,
                 ),
               ),
             ),
@@ -378,7 +378,16 @@ class _ListHeader extends StatelessWidget {
       return;
     }
     final playlist = mc.currentPlayList.value;
+    if (playlist.length <= 1) return;
+
     final currentIndex = mc.currentIndex;
+    if (playlist.length == 2) {
+      MediaPlayerController.setTrack(
+          songInfo: playlist[currentIndex == 0 ? 1 : 0]);
+      mc.start();
+      return;
+    }
+
     final index = Random().nextInt(playlist.length - 2);
     MediaPlayerController.setTrack(
         songInfo: playlist[index >= currentIndex ? index + 1 : index]);

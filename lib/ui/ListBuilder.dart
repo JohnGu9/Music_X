@@ -40,7 +40,7 @@ class StandardItem extends StatelessWidget {
             style: TextStyle(
                 inherit: true,
                 color:
-                    Theme.of(context).textTheme.body1.color.withOpacity(0.7)),
+                    Theme.of(context).textTheme.bodyText2.color.withOpacity(0.7)),
             children: [
               TextSpan(text: songInfo.album),
               const TextSpan(text: ' · '),
@@ -117,7 +117,7 @@ class FavoriteItem extends StatelessWidget {
 
   Widget _builder(BuildContext context, Palette value, Widget child) {
     final color = value.dominantTitleText == null
-        ? Theme.of(context).textTheme.body2.color
+        ? Theme.of(context).textTheme.bodyText1.color
         : value.dominantTitleText;
     return ListTile(
       title: Padding(
@@ -125,7 +125,7 @@ class FavoriteItem extends StatelessWidget {
         child: Text(
           songInfo.title,
           style: TextStyle(
-            fontSize: Theme.of(context).textTheme.body1.fontSize + 3.0,
+            fontSize: Theme.of(context).textTheme.bodyText2.fontSize + 3.0,
             color: color,
           ),
         ),

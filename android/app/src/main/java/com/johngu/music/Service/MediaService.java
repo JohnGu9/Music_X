@@ -363,7 +363,7 @@ public final class MediaService extends IntentService
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             audioAttributes = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .setFlags(AudioAttributes.FLAG_LOW_LATENCY)
+                    .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setLegacyStreamType(MainActivity.instance.getVolumeControlStream())
                     .build();

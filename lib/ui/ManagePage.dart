@@ -8,6 +8,8 @@ import 'package:music/ui.dart';
 import 'package:music/ui/AlbumInfoPage.dart';
 import 'package:music/unit.dart';
 
+import 'AddListDialog.dart';
+
 class ManagePage extends StatelessWidget {
   static push(BuildContext context) {
     return GeneralPageRoute.push(context, _builder,
@@ -75,7 +77,7 @@ class ManagePage extends StatelessWidget {
     return [
       SliverOverlapAbsorber(
         handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-        child: SliverAppBar(
+        sliver: SliverAppBar(
           pinned: true,
           elevation: 0.0,
           title: const Text('More'),
@@ -150,6 +152,8 @@ class _Favorite extends StatelessWidget {
   }
 }
 
+const textStyle = TextStyle(color: Colors.white);
+
 class _ListView extends StatelessWidget {
   const _ListView({Key key, this.scrollController}) : super(key: key);
   final ScrollController scrollController;
@@ -175,14 +179,14 @@ class _ListView extends StatelessWidget {
           padding: const EdgeInsets.all(30.0),
           child: Text(
             'If you like some songs,\nmark it as \'Favorite\' and can access them in this.',
-            style: Theme.of(context).textTheme.title,
+            style: Theme.of(context).textTheme.headline6,
           ),
         ),
       );
     return RawReorderableListView(
       scrollController: scrollController,
       onReorder: fm.reorder,
-      children: FavoriteMapList(parent: fm),
+      children: FavoriteItemMapList(parent: fm),
       header: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
         child: FadeTransition(
@@ -190,9 +194,15 @@ class _ListView extends StatelessWidget {
           child: ListTile(
             title: const Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: const Text('Favortie'),
+              child: const Text(
+                'Favortie',
+                style: textStyle,
+              ),
             ),
-            trailing: Text('${value.length}  Songs'),
+            trailing: Text(
+              '${value.length}  Songs',
+              style: textStyle,
+            ),
           ),
         ),
       ),
@@ -220,6 +230,25 @@ class _Library extends StatelessWidget {
       final BuildContext context, final List<String> value, Widget _) {
     const crossAxisCount = 2;
     final cm = CoreListManager();
+
+    _addCustomListManager() {
+      return showCupertinoDialog(context: context, builder: addListDialog);
+    }
+
+    Widget _childBuilder(final BuildContext context, final int index) {
+      if (cm.length <= index) return null;
+      return AnimationConfiguration.staggeredGrid(
+        position: index,
+        duration: const Duration(milliseconds: 375),
+        columnCount: crossAxisCount,
+        child: ScaleAnimation(
+          child: CustomListItemView(
+            listManager: cm.listManagers[index],
+          ),
+        ),
+      );
+    }
+
     Widget child;
     if (cm.state == ManagerState.updating)
       child = const SliverToBoxAdapter(
@@ -230,68 +259,17 @@ class _Library extends StatelessWidget {
           ),
         ),
       );
-    _addCustomListManager() {
-      return showCupertinoDialog(
-          context: context,
-          builder: (final context) {
-            return AlertDialog(
-              title: Text('Add new List'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  TextField(
-                    decoration: const InputDecoration(
-                      icon: Icon(Icons.library_music),
-                      labelText: 'Name',
-                    ),
-                  ),
-                ],
-              ),
-              actions: <Widget>[
-                FlatButton(
-                    onPressed: () {
-                      return Navigator.of(context).pop();
-                    },
-                    child: Text('Add')),
-                FlatButton(
-                    onPressed: () {
-                      return Navigator.of(context).pop();
-                    },
-                    child: Text('Cancel')),
-              ],
-            );
-          });
-    }
-
-    Widget _childBuilder(final BuildContext context, final int index) {
-      const shape = RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Constants.radius));
-      if (cm.length <= index) return null;
-      return AnimationConfiguration.staggeredGrid(
-        position: index,
-        duration: const Duration(milliseconds: 375),
-        columnCount: crossAxisCount,
-        child: ScaleAnimation(
-          child: Material(
-            shape: shape,
-            clipBehavior: Clip.hardEdge,
-            color: Theme.of(context).primaryColor,
-            child: Icon(Icons.album),
-          ),
+    else
+      child = SliverGrid(
+        delegate:
+            SliverChildBuilderDelegate(_childBuilder, childCount: cm.length),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          childAspectRatio: 1,
+          crossAxisSpacing: 20,
+          mainAxisSpacing: 20,
         ),
       );
-    }
-
-    child = SliverGrid(
-      delegate:
-          SliverChildBuilderDelegate(_childBuilder, childCount: cm.length),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        childAspectRatio: 1,
-        crossAxisSpacing: 20,
-        mainAxisSpacing: 20,
-      ),
-    );
 
     Widget _limiterWrap({@required Widget child}) {
       if (value.isEmpty) return child;
@@ -308,17 +286,33 @@ class _Library extends StatelessWidget {
             handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
           ),
           SliverToBoxAdapter(
-            child: ListTile(
-              title: Text('${value.length}  Playlists'),
-              trailing: FlatButton(
-                onPressed: _addCustomListManager,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const <Widget>[
-                    Icon(Icons.add),
-                    const VerticalDivider(width: 5),
-                    Text('Add Playlist'),
-                  ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: FadeTransition(
+                opacity: const AlwaysStoppedAnimation(0.7),
+                child: ListTile(
+                  title: Text(
+                    '${value.length}  Playlists',
+                    style: textStyle,
+                  ),
+                  trailing: FlatButton(
+                    onPressed: _addCustomListManager,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const <Widget>[
+                        Icon(
+                          Icons.add,
+                          color: Colors.white,
+                        ),
+                        const VerticalDivider(
+                            width: 5, color: Colors.transparent),
+                        Text(
+                          'Add Playlist',
+                          style: textStyle,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -357,7 +351,7 @@ class _Album extends StatelessWidget {
         duration: const Duration(milliseconds: 375),
         columnCount: crossAxisCount,
         child: ScaleAnimation(
-          child: AlbumImageView(
+          child: AlbumItemView(
             albumInfo: albumInfo,
           ),
         ),
@@ -385,7 +379,10 @@ class _Album extends StatelessWidget {
               child: ListTile(
                 title: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Text('${value.length}  Albums'),
+                  child: Text(
+                    '${value.length}  Albums',
+                    style: textStyle,
+                  ),
                 ),
               ),
             ),
@@ -409,57 +406,73 @@ class _Album extends StatelessWidget {
   }
 }
 
-class AlbumImageView extends StatelessWidget {
-  const AlbumImageView({Key key, this.albumInfo}) : super(key: key);
+class CustomListItemView extends StatelessWidget {
+  const CustomListItemView({Key key, this.listManager}) : super(key: key);
+  final ListManager listManager;
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: implement build
+    return Material(
+      elevation: 6.0,
+      shape: shape,
+      clipBehavior: Clip.hardEdge,
+      color: Theme.of(context).backgroundColor,
+      child: InkWell(
+        onTap: () {},
+        child: const Icon(Icons.album),
+      ),
+    );
+  }
+}
+
+class AlbumItemView extends StatelessWidget {
+  const AlbumItemView({Key key, this.albumInfo}) : super(key: key);
   final AlbumInfoProvider albumInfo;
 
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
-    return Hero(
-      tag: albumInfo.runtimeType.toString() + albumInfo.id,
-      transitionOnUserGestures: true,
-      child: Material(
-        elevation: 6.0,
-        shape: shape,
-        clipBehavior: Clip.hardEdge,
-        color: Theme.of(context).backgroundColor,
-        child: Stack(
-          children: <Widget>[
-            DelayValueListenableBuilder(
-              listenable: albumInfo.artwork,
-              builder: _imageBuilder,
-            ),
-            Container(
-              decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                      colors: const [Colors.transparent, Colors.black54],
-                      stops: [0.5, 0.9],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter)),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Text(
-                    albumInfo.title,
-                    style: TextStyle(color: Colors.white),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+    return Material(
+      elevation: 6.0,
+      shape: shape,
+      clipBehavior: Clip.hardEdge,
+      color: Theme.of(context).backgroundColor,
+      child: Stack(
+        children: <Widget>[
+          DelayValueListenableBuilder(
+            listenable: albumInfo.artwork,
+            builder: _imageBuilder,
+          ),
+          Container(
+            decoration: BoxDecoration(
+                gradient: LinearGradient(
+                    colors: const [Colors.transparent, Colors.black54],
+                    stops: [0.5, 0.9],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter)),
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Text(
+                  albumInfo.title,
+                  style: TextStyle(color: Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  return AlbumInfoPage.push(context, albumInfo);
-                },
-              ),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                return AlbumInfoPage.push(context, albumInfo);
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

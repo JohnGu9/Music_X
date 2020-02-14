@@ -469,7 +469,7 @@ class _FullViewContent1 extends StatelessWidget {
                     inherit: true,
                     color: Theme.of(context)
                         .textTheme
-                        .body1
+                        .bodyText2
                         .color
                         .withOpacity(0.7)),
                 children: [
@@ -485,7 +485,7 @@ class _FullViewContent1 extends StatelessWidget {
         ),
         subtitle: Text(
           songInfo?.title == null ? 'Music X' : songInfo.title,
-          style: Theme.of(context).textTheme.headline,
+          style: Theme.of(context).textTheme.headline5,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -1116,8 +1116,8 @@ class _ListItem extends StatelessWidget {
   static const notHighlightDecoration = BoxDecoration(
     gradient: const LinearGradient(
       colors: const [
+        Colors.black38,
         Colors.black54,
-        Colors.black87,
       ],
       stops: const [0.0, 0.9],
       begin: Alignment.topCenter,

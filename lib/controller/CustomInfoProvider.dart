@@ -15,17 +15,17 @@ class SongInfoManagerConfig {
   static const minDuration = 30 * 1000;
 }
 
-class GeneralInfoManager extends Subscribeable<String, dynamic>
+class SongInfoManager extends Subscribeable<String, dynamic>
     with BaseListDebug {
-  static GeneralInfoManager instance;
+  static SongInfoManager instance;
   static final Map<String, SongInfoProvider> songInfoCollection = Map();
 
-  factory GeneralInfoManager() {
-    instance ??= GeneralInfoManager._internal();
+  factory SongInfoManager() {
+    instance ??= SongInfoManager._internal();
     return instance;
   }
 
-  GeneralInfoManager._internal() : initialization = Future(_initialize);
+  SongInfoManager._internal() : initialization = Future(_initialize);
 
   final Future initialization;
 
@@ -122,7 +122,7 @@ class SongInfoProvider extends InfoProvider {
   static const unknown = '<unknown>';
 
   factory SongInfoProvider({final SongInfo songInfo, final String id}) {
-    return GeneralInfoManager.songInfoCollection[id ?? songInfo?.filePath] ??
+    return SongInfoManager.songInfoCollection[id ?? songInfo?.filePath] ??
         InValidSongInfoProvider.instance;
   }
 
@@ -151,6 +151,14 @@ class SongInfoProvider extends InfoProvider {
   String get artist => _songInfo.artist;
 
   int get duration => _duration;
+
+  String get stringDuration {
+    final _time = this.duration ~/ 1000;
+    return (_time ~/ 60).toString() +
+        ' min ' +
+        (_time % 60).toString() +
+        ' sec ';
+  }
 
   String get filePath => _songInfo.filePath;
 
@@ -237,7 +245,7 @@ class AlbumManager extends BaseList<AlbumInfoProvider> with ListNotify {
     addAll(albums.map<AlbumInfoProvider>((final e) {
       return AlbumInfoProvider._internal(e);
     }));
-    GeneralInfoManager.instance.addListener(_listener);
+    SongInfoManager.instance.addListener(_listener);
   }
 
   _listener() async {
@@ -283,8 +291,9 @@ class AlbumInfoProvider extends Subscribeable<String, String>
       return e.filePath;
     }));
     _songInfos = SongInfoMapList(parent: this);
-    PlayListRegister(_songInfos, title: title, onReorder: reorder);
-    subscribe(GeneralInfoManager.instance);
+    PlayListRegister(songInfos,
+        title: title, onReorder: reorder, listenable: this);
+    subscribe(SongInfoManager.instance);
   }
 
   final AlbumInfo albumInfo;

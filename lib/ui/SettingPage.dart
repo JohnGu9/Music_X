@@ -66,7 +66,7 @@ class _SettingPage extends AnimatedWidget {
                   child: FlexibleSpaceBar(
                     title: Text(
                       'Setting',
-                      style: Theme.of(context).textTheme.title,
+                      style: Theme.of(context).textTheme.headline6.apply(color: Colors.white),
                     ),
                   ),
                 ),
@@ -125,7 +125,7 @@ class _Preference extends StatelessWidget {
           leading: const Icon(Icons.palette),
           title: Text(
             'Preference',
-            style: Theme.of(context).textTheme.title,
+            style: Theme.of(context).textTheme.headline6,
           ),
         ),
         for (final theme in Themes.values) _builder(context, theme),

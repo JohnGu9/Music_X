@@ -1,7 +1,9 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:music/component.dart';
 import 'package:music/controller/CustomImageProvider.dart';
 import 'package:music/controller/CustomInfoProvider.dart';
+import 'package:music/controller/MediaPlayerController.dart';
 import 'package:music/ui.dart';
 import 'package:music/ui/ManagePage.dart';
 import 'package:music/unit.dart';
@@ -59,6 +61,8 @@ class AlbumInfoPage extends StatelessWidget {
   }
 }
 
+const textStyle = TextStyle(color: Colors.white);
+
 class _Detail extends StatelessWidget {
   const _Detail({Key key}) : super(key: key);
 
@@ -82,7 +86,7 @@ class _Detail extends StatelessWidget {
           child: RawReorderableListView(
             children: <Widget>[
               for (final songInfo in songInfos)
-                StandardItem(
+                AlbumSongInfoItem(
                   key: ValueKey(songInfo),
                   songInfo: songInfo,
                 ),
@@ -96,9 +100,15 @@ class _Detail extends StatelessWidget {
                 child: ListTile(
                   title: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Text('${albumInfo.length}  Songs'),
+                    child: Text(
+                      '${albumInfo.length}  Songs',
+                      style: textStyle,
+                    ),
                   ),
-                  subtitle: Text(albumInfo.artist),
+                  subtitle: Text(
+                    albumInfo.artist,
+                    style: textStyle,
+                  ),
                 ),
               ),
             ),
@@ -203,6 +213,11 @@ class _Detail extends StatelessWidget {
         ),
         ValueListenableBuilder(
             valueListenable: albumInfo, builder: _listBuilder),
+        SliverToBoxAdapter(
+          child: SizedBox(
+              height:
+                  MediaQuery.of(context).size.height * Panel.startValue + 8.0),
+        )
       ],
     );
   }
@@ -275,12 +290,128 @@ class AlbumInfoPagePreview extends StatelessWidget {
         Center(
           child: AspectRatio(
             aspectRatio: 1,
-            child: AlbumImageView(
+            child: AlbumItemView(
               albumInfo: albumInfo,
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class AlbumSongInfoItem extends StatefulWidget {
+  AlbumSongInfoItem({Key key, this.songInfo}) : super(key: key);
+  final SongInfoProvider songInfo;
+
+  @override
+  _AlbumSongInfoItemState createState() => _AlbumSongInfoItemState();
+}
+
+class _AlbumSongInfoItemState extends State<AlbumSongInfoItem>
+    with SingleTickerProviderStateMixin {
+  AnimationController _controller;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700));
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: implement build
+    void _onTap() {
+      final AlbumInfoProvider albumInfo =
+          AlbumInfoHeritage.of(context).albumInfo;
+      MediaPlayerController.setTrack(
+          songInfo: widget.songInfo, playlist: albumInfo.songInfos);
+      MediaPlayerController().start();
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        ListTile(
+          onTap: _onTap,
+          title: Text(widget.songInfo.title),
+          trailing: IconButton(
+            icon: const Icon(Icons.expand_more),
+            onPressed: _onPressed,
+          ),
+        ),
+        SizeTransition(
+          sizeFactor: _controller,
+          axis: Axis.vertical,
+          child: FadeTransition(
+            opacity: _controller,
+            child: _SongInfoDetail(
+              songInfo: widget.songInfo,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  _onPressed() {
+    _controller.value == 0
+        ? _controller.animateTo(
+            1.0,
+            curve: Curves.fastOutSlowIn,
+          )
+        : _controller.animateBack(
+            0.0,
+            curve: Curves.fastOutSlowIn,
+          );
+  }
+}
+
+class _SongInfoDetail extends StatelessWidget {
+  const _SongInfoDetail({Key key, @required this.songInfo}) : super(key: key);
+  final SongInfoProvider songInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: implement build
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: <Widget>[
+          SizedBox(
+            width: 100,
+            child: SongInfoArtworkView(
+              artwork: songInfo.artwork,
+            ),
+          ),
+          const VerticalDivider(
+            color: Colors.transparent,
+          ),
+          Expanded(
+            child: FadeTransition(
+              opacity: const AlwaysStoppedAnimation(0.7),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text('Duration: ${songInfo.stringDuration}'),
+                  Text('File Path: ${songInfo.filePath}'),
+                  Text('File Size: ${songInfo.fileSize}'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

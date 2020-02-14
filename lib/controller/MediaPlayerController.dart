@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:music/component/CustomValueNotifier.dart';
 import 'package:music/controller/CustomInfoProvider.dart';
-import 'package:music/controller/CustomListManager.dart';
 import 'package:music/unit/MediaPlayer.dart';
 
 enum MediaPlayerSequenceMode {
@@ -255,8 +254,8 @@ class MediaPlayerController {
     if (currentPlayListDiff) {
       assert(PlayListRegister.check(playlist), 'This PlayList is illegal. ');
       if (RecentLog.log.isNotEmpty)
-        RecentLog.log.last.playList.listManager.removeListener(_listener);
-      PlayListRegister(playlist).listManager.addListener(_listener);
+        RecentLog.log.last.playList.listenable.removeListener(_listener);
+      PlayListRegister(playlist).listenable.addListener(_listener);
       _instance.currentPlayList.value = playlist;
     }
     if (currentDiff) _instance.current.value = songInfo;
@@ -347,7 +346,7 @@ class PlayListRegister {
   }
 
   factory PlayListRegister(List playList,
-      {ListManager listManager,
+      {Listenable listenable,
       String title,
       Function(int, int) onReorder,
       String subTitle,
@@ -356,7 +355,7 @@ class PlayListRegister {
     if (!registers.containsKey(playList)) {
       assert(title != null);
       registers[playList] = PlayListRegister._internal(
-          playList, title, onReorder, listManager, subTitle, icon);
+          playList, title, onReorder, listenable, subTitle, icon);
     }
     return registers[playList];
   }
@@ -365,19 +364,18 @@ class PlayListRegister {
     registers.remove(playListRegister.playList);
   }
 
-  const PlayListRegister._internal(this.playList, this.title, this._onReorder,
-      this.listManager, this.subTitle, this.icon);
+  const PlayListRegister._internal(this.playList, this.title, this.onReorder,
+      this.listenable, this.subTitle, this.icon)
+      : assert(playList != null),
+        assert(listenable != null),
+        assert(onReorder != null);
 
   final String title;
   final String subTitle;
   final List playList;
-  final ListManager listManager;
+  final Listenable listenable;
   final Icon icon;
-  final Function(int, int) _onReorder;
-
-  Function(int, int) get onReorder {
-    return _onReorder ?? listManager.reorder;
-  }
+  final Function(int, int) onReorder;
 
   @override
   String toString() {

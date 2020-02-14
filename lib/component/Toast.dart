@@ -110,7 +110,7 @@ class _EaseMassageState extends ToastState<EaseMassage>
               padding: Toast.standardPadding,
               child: Text(
                 widget.text,
-                style: Theme.of(context).textTheme.body2,
+                style: Theme.of(context).textTheme.bodyText1,
               ),
             )),
       ),

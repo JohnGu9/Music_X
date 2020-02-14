@@ -240,7 +240,10 @@ class _SongInfoView extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: SelectableText(
                 SongInfoHeritage.of(context).songInfo.title,
-                style: Theme.of(context).textTheme.headline,
+                style: Theme.of(context)
+                    .textTheme
+                    .headline5
+                    .apply(color: Colors.white),
               ),
             ),
           ),
@@ -280,9 +283,8 @@ class _Detail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
-    final _time = SongInfoHeritage.of(context).songInfo.duration ~/ 1000;
-    final String duration =
-        (_time ~/ 60).toString() + ' min ' + (_time % 60).toString() + ' sec ';
+    final songInfo = SongInfoHeritage.of(context).songInfo;
+    final theme = Theme.of(context);
     return Padding(
       padding: PageSidePadding,
       child: Column(
@@ -294,8 +296,8 @@ class _Detail extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.album),
             title: SelectableText(
-              SongInfoHeritage.of(context).songInfo.album,
-              style: Theme.of(context).textTheme.body1,
+              songInfo.album,
+              style: theme.textTheme.bodyText2,
             ),
             subtitle: const Text('Album'),
           ),
@@ -304,8 +306,8 @@ class _Detail extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.person),
             title: SelectableText(
-              SongInfoHeritage.of(context).songInfo.artist,
-              style: Theme.of(context).textTheme.body1,
+              songInfo.artist,
+              style: theme.textTheme.bodyText2,
             ),
             subtitle: const Text('Artist'),
           ),
@@ -314,8 +316,8 @@ class _Detail extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.closed_caption),
             title: SelectableText(
-              SongInfoHeritage.of(context).songInfo.composer,
-              style: Theme.of(context).textTheme.body1,
+              songInfo.composer,
+              style: theme.textTheme.bodyText2,
             ),
             subtitle: const Text('Composer'),
           ),
@@ -324,8 +326,8 @@ class _Detail extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.calendar_today),
             title: SelectableText(
-              SongInfoHeritage.of(context).songInfo.year,
-              style: Theme.of(context).textTheme.body1,
+              songInfo.year,
+              style: theme.textTheme.bodyText2,
             ),
             subtitle: const Text('Release Year'),
           ),
@@ -334,8 +336,8 @@ class _Detail extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.art_track),
             title: SelectableText(
-              SongInfoHeritage.of(context).songInfo.track,
-              style: Theme.of(context).textTheme.body1,
+              songInfo.track,
+              style: theme.textTheme.bodyText2,
             ),
             subtitle: const Text('Track amount'),
           ),
@@ -344,8 +346,8 @@ class _Detail extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.access_time),
             title: SelectableText(
-              duration,
-              style: Theme.of(context).textTheme.body1,
+              songInfo.stringDuration,
+              style: theme.textTheme.bodyText2,
             ),
             subtitle: const Text('Duration'),
           ),
@@ -354,8 +356,8 @@ class _Detail extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.find_in_page),
             title: SelectableText(
-              SongInfoHeritage.of(context).songInfo.filePath,
-              style: Theme.of(context).textTheme.body1,
+              songInfo.filePath,
+              style: theme.textTheme.bodyText2,
             ),
             subtitle: const Text('File Path'),
           ),

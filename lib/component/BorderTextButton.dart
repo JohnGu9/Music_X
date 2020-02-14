@@ -26,15 +26,15 @@ class BorderTextButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // TODO: implement build
-    final _color = color ?? Theme.of(context).textTheme.title.color;
+    final _color = color ?? Theme.of(context).textTheme.headline6.color;
     final shape = StadiumBorder(
         side: BorderSide(
             color: paddingColor == null ? _color : Colors.transparent));
     final content = <Widget>[
       Text(text,
           style: TextStyle(
-              fontSize: fontSize ?? Theme.of(context).textTheme.title.fontSize,
-              fontFamily: Theme.of(context).textTheme.title.fontFamily,
+              fontSize: fontSize ?? Theme.of(context).textTheme.headline6.fontSize,
+              fontFamily: Theme.of(context).textTheme.headline6.fontFamily,
               fontWeight: FontWeight.w500,
               color: textColor ?? _color)),
     ];

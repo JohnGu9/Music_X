@@ -6,7 +6,7 @@ import 'package:music/ui.dart';
 import 'MediaPlayerController.dart';
 
 get dataCenter {
-  return GeneralInfoManager();
+  return SongInfoManager();
 }
 
 enum ManagerState {
@@ -23,7 +23,7 @@ class CoreListManager extends Subscribeable<String, dynamic>
   static const databaseListManager = 'ListManager';
   static const databaseCustomListManager = 'CustomListManager';
   static const fixedListManager = ['library', 'favorite'];
-  static final dataCenter = GeneralInfoManager();
+  static final dataCenter = SongInfoManager();
   static CoreListManager instance = CoreListManager._internal();
 
   factory CoreListManager() {
@@ -51,21 +51,29 @@ class CoreListManager extends Subscribeable<String, dynamic>
     state = ManagerState.updating;
     await bind(database: databaseListManager, table: databaseCustomListManager);
     // after bind, the data will be recovery from database and ready to subscribe parent;
-    addListener(_watchOver);
     state = ManagerState.updated;
   }
 
-  @protected
-  _watchOver() async {
-    assert(this.toSet().length == length, 'illegel new list name');
-    final storageNames = await recoverToList();
-    final missingNames = takeWhile((final element) {
-      return !storageNames.contains(element);
-    });
-    // release the data
-    missingNames.forEach((final element) {
-      CustomListManager(table: element).dispose();
-    });
+  bool tryToAdd(String element) {
+    final bool res = validElement(element);
+    if (res) super.add(element);
+    return res;
+  }
+
+  bool validElement(String element) {
+    if (element == null) return false;
+    if (element.isEmpty) return false;
+    if (contains(element)) return false;
+    return true;
+  }
+
+  @override
+  bool remove(Object element) {
+    // TODO: implement remove
+    final index = indexOf(element);
+    if (index != null) listManagers[index].dispose();
+
+    return super.remove(element);
   }
 
   @override
@@ -104,7 +112,7 @@ abstract class ListManager extends Subscribeable<String, String>
     _initialization = initialize(table);
     _songInfos = SongInfoMapList(parent: this);
     PlayListRegister(_songInfos,
-        title: table, onReorder: reorder, listManager: this);
+        title: table, onReorder: reorder, listenable: this);
   }
 
   Future get initialization => _initialization;
@@ -212,7 +220,7 @@ class CustomListManager extends ListManager {
 }
 
 abstract class WidgetMapList<T> extends EfficientMapList<Widget, T> {
-  Map<T, Widget> widgets = Map();
+  final Map<T, Widget> widgets = Map();
 
   WidgetMapList({@required List<T> parent}) : super(parent: parent);
 
@@ -261,15 +269,15 @@ class StandardItemMapList extends WidgetMapList<String> {
   }
 }
 
-class FavoriteMapList extends WidgetMapList<String> {
-  static final Map<List<String>, FavoriteMapList> cache = Map();
+class FavoriteItemMapList extends WidgetMapList<String> {
+  static final Map<List<String>, FavoriteItemMapList> cache = Map();
 
-  factory FavoriteMapList({@required List<String> parent}) {
-    cache[parent] ??= FavoriteMapList._internal(parent: parent);
+  factory FavoriteItemMapList({@required List<String> parent}) {
+    cache[parent] ??= FavoriteItemMapList._internal(parent: parent);
     return cache[parent];
   }
 
-  FavoriteMapList._internal({@required List<String> parent})
+  FavoriteItemMapList._internal({@required List<String> parent})
       : super(parent: parent);
 
   @override
